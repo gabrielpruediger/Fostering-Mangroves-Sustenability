@@ -1,0 +1,42 @@
+// Define Study Field (Region of Interest)
+var geometry = ee.Geometry.Polygon(
+[[
+[140.07572, -2.38545],
+[140.17363, -2.38545],
+[140.17363, -2.30471],
+[140.07572, -2.30471]
+]]
+);
+// Load the soil organic carbon image
+var soilimage = ee.Image('OpenLandMap/SOL/SOL_ORGANIC-CARBON_USDA-6A1C_M/v02')
+.clip(geometry); // Clip the image to the specified geometry
+// Function to calculate total soil organic carbon content across all bands
+var calculateTotalSOC = function(image) {
+// Reduce the image to compute sum across all bands within the region of interest
+var totalSOC = image.reduceRegion({
+reducer: ee.Reducer.sum(),
+geometry: geometry,
+scale: 30,
+bestEffort: true
+});
+// Convert the computed total soil organic carbon content from g/m² to Mg/ha (1 Mg = 1000 kg, 1 hectare = 10000 m²)
+var totalSOC_Mg_per_ha = ee.Number(totalSOC.values().get(0)).divide(1000000).multiply(10000);
+// Add the computed total soil organic carbon content as a property to the original image
+return image.set('totalSOC_Mg_per_ha', totalSOC_Mg_per_ha);
+};
+// Apply the function to calculate total SOC to the clipped image
+var soilimageWithTotalSOC = calculateTotalSOC(soilimage);
+// Display the result (total SOC in Mg/ha) in the console
+print('Total Soil Organic Carbon (Mg/ha) in the region:', soilimageWithTotalSOC.get('totalSOC_Mg_per_ha'));
+// Display the clipped image on the map with visualization parameters
+var visualization = {
+bands: ['b0'], // Display one of the bands (e.g., 'b0') for visualization
+min: 0.0,
+max: 120.0,
+palette: [
+'ffffa0', 'f7fcb9', 'd9f0a3', 'addd8e', '78c679', '41ab5d',
+'238443', '005b29', '004b29', '012b13', '00120b'
+]
+};
+Map.addLayer(soilimage, visualization, 'Soil Organic Carbon Image');
+Map.centerObject(geometry, 10); // Center the map on the specified geometry
