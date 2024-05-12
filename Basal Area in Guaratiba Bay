@@ -1,0 +1,29 @@
+// Define Study Field (Region of Interest)
+var geometry = ee.Geometry.Polygon(
+[[[-43.550, -23.000],
+[-43.650, -23.000],
+[-43.650, -23.050],
+[-43.550, -23.050]]]
+});
+var sentinel2 = ee.ImageCollection('COPERNICUS/S2');
+var filtered = sentinel2.filterBounds(geometry)
+.filterDate('2022-01-01', '2022-12-31')
+.sort('CLOUD_COVERAGE_ASSESSMENT');
+var ndvi = filtered.map(function(image) {
+var ndvi = image.normalizedDifference(['B8', 'B4']).rename('NDVI');
+return image.addBands(ndvi);
+});
+// Define a threshold for NDVI to identify mangroves
+var mangroveThreshold = 0.2;
+var mangroves = ndvi.map(function(image) {
+return image.select('NDVI').gt(mangroveThreshold);
+}).max();
+var mangroveArea = mangroves.reduceRegion({
+reducer: ee.Reducer.sum(),
+geometry: geometry,
+scale: 10, // Adjust the scale according to your preference
+maxPixels: 1e9 // Set a maximum number of pixels to reduce
+});
+// Convert area from square meters to hectares
+var mangroveAreaHa = mangroveArea.getNumber('NDVI').divide(10000);
+print('Mangrove Area (ha):', mangroveAreaHa);
